@@ -47,4 +47,5 @@ if __name__ == "__main__":
     logger.info("=" * 60)
     app = create_app()
     logger.info("Dashboard running at http://localhost:8050")
-    app.run(debug=True, host="0.0.0.0", port=8050)
+    debug_mode = os.getenv("APP_ENV", "development") == "development"
+    app.run(debug=debug_mode, host="0.0.0.0", port=8050)
