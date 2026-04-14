@@ -2,6 +2,7 @@
 
 import os
 import sys
+import socket
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from dotenv import load_dotenv
@@ -13,14 +14,21 @@ load_dotenv()
 logger = get_logger("database.connection")
 
 
+def force_ipv4():
+    """Force all connections to use IPv4 — needed for Render free tier."""
+    orig_getaddrinfo = socket.getaddrinfo
+    def getaddrinfo_ipv4(host, port, family=0, type=0, proto=0, flags=0):
+        return orig_getaddrinfo(host, port, socket.AF_INET, type, proto, flags)
+    socket.getaddrinfo = getaddrinfo_ipv4
+
+
 def get_database_url() -> str:
     host = os.getenv("POSTGRES_HOST", "localhost")
     port = os.getenv("POSTGRES_PORT", "5432")
     db = os.getenv("POSTGRES_DB", "jobmarket")
     user = os.getenv("POSTGRES_USER", "admin")
     password = os.getenv("POSTGRES_PASSWORD", "admin123")
-    url = f"postgresql://{user}:{password}@{host}:{port}/{db}"
-    return url
+    return f"postgresql://{user}:{password}@{host}:{port}/{db}"
 
 
 def get_engine():
@@ -30,7 +38,8 @@ def get_engine():
 
     logger.info(f"Creating database engine for: {url.split('@')[1]}")
 
-    if app_env == "production" or "supabase" in host:
+    if app_env == "production" or "supabase" in host or "pooler" in host:
+        force_ipv4()
         connect_args = {
             "sslmode": "require",
             "connect_timeout": 60,
@@ -39,7 +48,7 @@ def get_engine():
             "keepalives_interval": 10,
             "keepalives_count": 5
         }
-        logger.info("SSL mode enabled for Supabase production database")
+        logger.info("SSL + IPv4 forced for Supabase production database")
     else:
         connect_args = {}
 
