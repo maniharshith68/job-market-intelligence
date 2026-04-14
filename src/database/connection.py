@@ -27,16 +27,32 @@ def get_engine():
     url = get_database_url()
     host = os.getenv("POSTGRES_HOST", "localhost")
     app_env = os.getenv("APP_ENV", "development")
-    
+
     logger.info(f"Creating database engine for: {url.split('@')[1]}")
 
     if app_env == "production" or "supabase" in host:
-        connect_args = {"sslmode": "require"}
-        logger.info("SSL mode enabled for production database")
+        connect_args = {
+            "sslmode": "require",
+            "connect_timeout": 60,
+            "keepalives": 1,
+            "keepalives_idle": 30,
+            "keepalives_interval": 10,
+            "keepalives_count": 5
+        }
+        logger.info("SSL mode enabled for Supabase production database")
     else:
         connect_args = {}
-    
-    engine = create_engine(url, echo=False, pool_pre_ping=True, connect_args=connect_args)
+
+    engine = create_engine(
+        url,
+        echo=False,
+        pool_pre_ping=True,
+        pool_size=5,
+        max_overflow=10,
+        pool_timeout=60,
+        pool_recycle=300,
+        connect_args=connect_args
+    )
     return engine
 
 
