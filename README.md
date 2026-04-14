@@ -66,6 +66,7 @@ jobs.csv (raw data)
 
 ## 📁 Project Structure
 
+```
 job-market-intelligence/
 ├── config/                  # YAML configuration
 ├── data/
@@ -85,6 +86,7 @@ job-market-intelligence/
 ├── docker-compose.yml
 ├── requirements.txt
 └── .env.example
+```
 
 ---
 
