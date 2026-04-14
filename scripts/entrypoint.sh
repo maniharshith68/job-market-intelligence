@@ -5,7 +5,7 @@ echo "============================================================"
 echo "  JOB MARKET INTELLIGENCE PLATFORM — STARTING UP"
 echo "============================================================"
 
-echo "[1/5] Waiting for PostgreSQL..."
+echo "[1/2] Waiting for PostgreSQL..."
 python - <<EOF
 import time
 import psycopg2
@@ -21,7 +21,7 @@ app_env = os.environ.get("APP_ENV", "development")
 
 extra = {"sslmode": "require"} if (app_env == "production" or "supabase" in host or "pooler" in host) else {}
 
-# Force IPv4 only
+# Force IPv4
 orig_getaddrinfo = socket.getaddrinfo
 def getaddrinfo_ipv4(h, p, family=0, type=0, proto=0, flags=0):
     return orig_getaddrinfo(h, p, socket.AF_INET, type, proto, flags)
@@ -51,23 +51,6 @@ if [ ! -f "data/raw/jobs.csv" ]; then
     exit 1
 fi
 
-echo "[2/5] Running data ingestion pipeline..."
-python -m src.ingestion.run_ingestion
-echo "  Ingestion complete ✅"
-
-echo "[3/5] Running NLP pipeline..."
-python -m src.nlp.run_nlp
-echo "  NLP pipeline complete ✅"
-
-echo "[4/5] Running NER skill extraction..."
-python -m src.nlp.run_ner
-echo "  NER complete ✅"
-
-echo "[5/5] Loading data into PostgreSQL..."
-python -m src.database.run_database
-echo "  Database loaded ✅"
-
-echo "============================================================"
-echo "  Starting dashboard at http://0.0.0.0:8050"
+echo "[2/2] Starting dashboard (pipeline runs in background)..."
 echo "============================================================"
 python -m src.dashboard.app

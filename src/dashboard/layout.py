@@ -3,6 +3,7 @@
 import dash_bootstrap_components as dbc
 from dash import dcc, html
 from src.dashboard.resume_tab import create_resume_tab_layout
+from dash import dcc
 
 
 HEADER_STYLE = {
@@ -47,6 +48,12 @@ def create_layout(total_jobs: int) -> html.Div:
 
         # ── Header ──────────────────────────────────────────────
         html.Div([
+            # Add pipeline status refresh interval
+            dcc.Interval(
+                id="pipeline-check-interval",
+                interval=10000,  # check every 10 seconds
+                n_intervals=0
+            ),
             dbc.Container([
                 dbc.Row([
                     dbc.Col([
