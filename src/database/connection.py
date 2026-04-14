@@ -25,8 +25,18 @@ def get_database_url() -> str:
 
 def get_engine():
     url = get_database_url()
+    host = os.getenv("POSTGRES_HOST", "localhost")
+    app_env = os.getenv("APP_ENV", "development")
+    
     logger.info(f"Creating database engine for: {url.split('@')[1]}")
-    engine = create_engine(url, echo=False, pool_pre_ping=True)
+
+    if app_env == "production" or "supabase" in host:
+        connect_args = {"sslmode": "require"}
+        logger.info("SSL mode enabled for production database")
+    else:
+        connect_args = {}
+    
+    engine = create_engine(url, echo=False, pool_pre_ping=True, connect_args=connect_args)
     return engine
 
 
