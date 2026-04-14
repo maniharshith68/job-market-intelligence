@@ -1,0 +1,60 @@
+# ── Python ───────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
+*.pyc
+.Python
+*.egg-info/
+*.egg
+dist/
+build/
+wheels/
+.python-version
+
+# ── Virtual Environment ───────────────────────────────────────
+.venv/
+venv/
+env/
+ENV/
+
+# ── Environment & Secrets ─────────────────────────────────────
+.env
+*.env.local
+
+# ── Data Files ────────────────────────────────────────────────
+data/raw/
+data/processed/
+
+# ── Logs ──────────────────────────────────────────────────────
+logs/
+
+# ── Jupyter ───────────────────────────────────────────────────
+.ipynb_checkpoints/
+*.ipynb
+
+# ── macOS ─────────────────────────────────────────────────────
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# ── IDEs ──────────────────────────────────────────────────────
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# ── Docker ────────────────────────────────────────────────────
+pgdata/
+
+# ── Testing ───────────────────────────────────────────────────
+.pytest_cache/
+.coverage
+htmlcov/
+
+# ── Misc ──────────────────────────────────────────────────────
+*.csv
+*.pkl
+*.pickle
+*.DS_Store

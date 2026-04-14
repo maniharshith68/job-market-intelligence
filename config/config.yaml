@@ -1,0 +1,28 @@
+# config/config.yaml
+app:
+  name: "Job Market Intelligence Platform"
+  version: "1.0.0"
+  env: "development"
+
+paths:
+  raw_data: "data/raw/jobs.csv"
+  processed_data: "data/processed/"
+  logs: "logs/"
+
+nlp:
+  min_df: 2
+  max_features: 500
+  n_topics: "auto"
+  top_n_skills: 10
+  min_topic_size: 3
+
+database:
+  host: "localhost"
+  port: 5432
+  name: "jobmarket"
+  user: "admin"
+
+logging:
+  level: "INFO"
+  max_bytes: 5242880   # 5MB
+  backup_count: 3
