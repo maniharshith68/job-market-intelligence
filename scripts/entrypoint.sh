@@ -19,19 +19,25 @@ port = int(os.environ.get("POSTGRES_PORT", 5432))
 db = os.environ.get("POSTGRES_DB", "jobmarket")
 user = os.environ.get("POSTGRES_USER", "admin")
 password = os.environ.get("POSTGRES_PASSWORD", "admin123")
+app_env = os.environ.get("APP_ENV", "development")
 
-for i in range(30):
+# Use SSL for Supabase
+extra = {"sslmode": "require"} if (app_env == "production" or "supabase" in host) else {}
+
+for i in range(60):
     try:
         conn = psycopg2.connect(
             host=host, port=port, dbname=db,
-            user=user, password=password
+            user=user, password=password,
+            connect_timeout=30,
+            **extra
         )
         conn.close()
         print("  PostgreSQL is ready ✅")
         break
-    except psycopg2.OperationalError:
-        print(f"  PostgreSQL not ready yet, retrying in 2s... ({i+1}/30)")
-        time.sleep(2)
+    except psycopg2.OperationalError as e:
+        print(f"  Retrying in 3s... ({i+1}/60) — {str(e)[:80]}")
+        time.sleep(3)
 else:
     print("ERROR: PostgreSQL did not become ready in time.")
     exit(1)
@@ -40,7 +46,6 @@ EOF
 # ── Check if data/raw/jobs.csv exists ───────────────────────
 if [ ! -f "data/raw/jobs.csv" ]; then
     echo "ERROR: data/raw/jobs.csv not found!"
-    echo "Please ensure jobs.csv is in the data/raw/ directory."
     exit 1
 fi
 
@@ -66,6 +71,6 @@ echo "  Database loaded ✅"
 
 # ── Start dashboard ──────────────────────────────────────────
 echo "============================================================"
-echo "  Starting dashboard at http://localhost:8050"
+echo "  Starting dashboard at http://0.0.0.0:8050"
 echo "============================================================"
 python -m src.dashboard.app
