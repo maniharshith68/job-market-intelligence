@@ -185,15 +185,16 @@ POSTGRES_PASSWORD=yourpassword
 GROQ_API_KEY=your_groq_key_here
 APP_ENV=development
 ```
-
 ---
 
-## 📄 License
-
-MIT License — see [LICENSE](LICENSE) for details.
-
----
-
-## 👤 Author
-
+## Collaboration
+This project was developed in collaboration with [Shruti Kumari](https://github.com/shrutisurya108).
+ 
+## Acknowledgements
+This project was built in collaboration with [Shruti Kumari](https://github.com/shrutisurya108).
+ 
+## 👤 Authors
+- [Harshith Bhattaram](https://github.com/maniharshith68)
+- [Shruti Kumari](https://github.com/shrutisurya108)
+ 
 Built with ❤️ as a production-grade data science portfolio project.
