@@ -13,29 +13,30 @@ from src.utils.logger import get_logger
 load_dotenv()
 logger = get_logger("database.connection")
 
+# Singleton engine — created once, reused everywhere
+_engine = None
+
 
 def force_ipv4():
-    """Force all connections to use IPv4 — needed for Render free tier."""
-    orig_getaddrinfo = socket.getaddrinfo
-    def getaddrinfo_ipv4(host, port, family=0, type=0, proto=0, flags=0):
-        return orig_getaddrinfo(host, port, socket.AF_INET, type, proto, flags)
-    socket.getaddrinfo = getaddrinfo_ipv4
+    orig = socket.getaddrinfo
+    def ipv4_only(host, port, family=0, type=0, proto=0, flags=0):
+        return orig(host, port, socket.AF_INET, type, proto, flags)
+    socket.getaddrinfo = ipv4_only
 
 
-def get_database_url() -> str:
+def get_engine():
+    global _engine
+    if _engine is not None:
+        return _engine
+
     host = os.getenv("POSTGRES_HOST", "localhost")
     port = os.getenv("POSTGRES_PORT", "5432")
     db = os.getenv("POSTGRES_DB", "jobmarket")
     user = os.getenv("POSTGRES_USER", "admin")
     password = os.getenv("POSTGRES_PASSWORD", "admin123")
-    return f"postgresql://{user}:{password}@{host}:{port}/{db}"
-
-
-def get_engine():
-    url = get_database_url()
-    host = os.getenv("POSTGRES_HOST", "localhost")
     app_env = os.getenv("APP_ENV", "development")
 
+    url = f"postgresql://{user}:{password}@{host}:{port}/{db}"
     logger.info(f"Creating database engine for: {url.split('@')[1]}")
 
     if app_env == "production" or "supabase" in host or "pooler" in host:
@@ -52,17 +53,17 @@ def get_engine():
     else:
         connect_args = {}
 
-    engine = create_engine(
+    _engine = create_engine(
         url,
         echo=False,
         pool_pre_ping=True,
-        pool_size=5,
-        max_overflow=10,
-        pool_timeout=60,
+        pool_size=3,        # Max 3 persistent connections
+        max_overflow=2,     # Max 2 overflow = 5 total max
+        pool_timeout=30,
         pool_recycle=300,
         connect_args=connect_args
     )
-    return engine
+    return _engine
 
 
 def get_session():

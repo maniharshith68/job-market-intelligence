@@ -47,7 +47,7 @@ def create_layout(total_jobs: int) -> html.Div:
         # Auto-refresh every 30 seconds
         dcc.Interval(
             id="stats-refresh-interval",
-            interval=30000,
+            interval=60000,
             n_intervals=0,
             disabled=False
         ),
