@@ -8,7 +8,6 @@ sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
 
 import dash
 import dash_bootstrap_components as dbc
-from dash import html
 from dotenv import load_dotenv
 
 from src.dashboard.layout import create_layout
@@ -19,12 +18,13 @@ from src.utils.logger import get_logger
 load_dotenv()
 logger = get_logger("dashboard.app")
 
-# Global flag to track pipeline status
-pipeline_status = {"done": False, "error": None}
+# Module-level flag — prevents double pipeline runs
+_pipeline_started = False
+_pipeline_lock = threading.Lock()
 
 
 def run_pipeline():
-    """Run the full NLP pipeline in background thread."""
+    """Run the full NLP pipeline in a background thread."""
     try:
         logger.info("Background pipeline starting...")
 
@@ -44,21 +44,51 @@ def run_pipeline():
         logger.info("Running database loader...")
         run_db()
 
-        pipeline_status["done"] = True
         logger.info("Background pipeline complete ✅")
 
     except Exception as e:
-        pipeline_status["error"] = str(e)
         logger.error(f"Background pipeline failed: {e}")
 
 
-def get_total_jobs():
-    """Safely fetch job count, return 0 if DB not ready."""
+def get_total_jobs() -> int:
+    """Safely fetch job count — returns 0 if DB not ready."""
     try:
         from src.dashboard.data_loader import get_total_job_count
         return get_total_job_count()
     except Exception:
         return 0
+
+
+def should_run_pipeline() -> bool:
+    """Return True if DB is empty and pipeline needs to run."""
+    try:
+        from src.database.connection import test_connection
+        if not test_connection():
+            logger.warning("DB connection failed — will run pipeline")
+            return True
+        jobs = get_total_jobs()
+        logger.info(f"DB check: {jobs} jobs found")
+        return jobs == 0
+    except Exception as e:
+        logger.warning(f"Pipeline check error: {e} — will run pipeline")
+        return True
+
+
+def start_pipeline_if_needed():
+    """Start the background pipeline thread if DB is empty."""
+    global _pipeline_started
+    with _pipeline_lock:
+        if _pipeline_started:
+            logger.info("Pipeline already started — skipping")
+            return
+        if should_run_pipeline():
+            logger.info("DB empty — starting background pipeline thread...")
+            t = threading.Thread(target=run_pipeline, daemon=True)
+            t.start()
+            _pipeline_started = True
+        else:
+            logger.info("DB already has data — skipping pipeline ✅")
+            _pipeline_started = True
 
 
 def create_app() -> dash.Dash:
@@ -71,12 +101,10 @@ def create_app() -> dash.Dash:
         title="Job Market Intelligence",
         suppress_callback_exceptions=True
     )
-
     total_jobs = get_total_jobs()
     app.layout = create_layout(total_jobs)
     register_callbacks(app)
     register_resume_callbacks(app)
-
     return app
 
 
@@ -87,26 +115,8 @@ if __name__ == "__main__":
 
     app_env = os.getenv("APP_ENV", "development")
 
-    # In production, check if pipeline needs to run
     if app_env == "production":
-        try:
-            from src.database.connection import test_connection
-            from src.database.data_loader import get_total_job_count
-            conn_ok = test_connection()
-            jobs = get_total_jobs()
-            if conn_ok and jobs > 0:
-                logger.info(f"Database already has {jobs} jobs — skipping pipeline")
-                pipeline_status["done"] = True
-            else:
-                logger.info("Starting background pipeline thread...")
-                t = threading.Thread(target=run_pipeline, daemon=True)
-                t.start()
-        except Exception:
-            logger.info("Starting background pipeline thread...")
-            t = threading.Thread(target=run_pipeline, daemon=True)
-            t.start()
-    else:
-        pipeline_status["done"] = True
+        start_pipeline_if_needed()
 
     app = create_app()
     debug_mode = app_env == "development"

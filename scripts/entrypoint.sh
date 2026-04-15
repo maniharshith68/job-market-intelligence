@@ -19,9 +19,13 @@ user = os.environ.get("POSTGRES_USER", "admin")
 password = os.environ.get("POSTGRES_PASSWORD", "admin123")
 app_env = os.environ.get("APP_ENV", "development")
 
-extra = {"sslmode": "require"} if (app_env == "production" or "supabase" in host or "pooler" in host) else {}
+extra = {"sslmode": "require"} if (
+    app_env == "production" or
+    "supabase" in host or
+    "pooler" in host
+) else {}
 
-# Force IPv4
+# Force IPv4 — required for Render free tier
 orig_getaddrinfo = socket.getaddrinfo
 def getaddrinfo_ipv4(h, p, family=0, type=0, proto=0, flags=0):
     return orig_getaddrinfo(h, p, socket.AF_INET, type, proto, flags)
@@ -46,11 +50,12 @@ else:
     exit(1)
 EOF
 
+# Verify dataset exists
 if [ ! -f "data/raw/jobs.csv" ]; then
     echo "ERROR: data/raw/jobs.csv not found!"
     exit 1
 fi
 
-echo "[2/2] Starting dashboard (pipeline runs in background)..."
+echo "[2/2] Starting dashboard (pipeline runs in background if DB empty)..."
 echo "============================================================"
 python -m src.dashboard.app

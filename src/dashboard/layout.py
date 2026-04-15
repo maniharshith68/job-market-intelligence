@@ -3,8 +3,6 @@
 import dash_bootstrap_components as dbc
 from dash import dcc, html
 from src.dashboard.resume_tab import create_resume_tab_layout
-from dash import dcc
-
 
 HEADER_STYLE = {
     "background": "linear-gradient(135deg, #2d3436 0%, #4361ee 100%)",
@@ -46,14 +44,17 @@ def create_stat_card(title: str, value: str, icon: str, color: str) -> dbc.Card:
 def create_layout(total_jobs: int) -> html.Div:
     return html.Div([
 
+        # Auto-refresh every 30 seconds
+        dcc.Interval(
+            id="stats-refresh-interval",
+            interval=30000,
+            n_intervals=0,
+            disabled=False
+        ),
+        html.Div(id="stats-refresh-output", style={"display": "none"}),
+
         # ── Header ──────────────────────────────────────────────
         html.Div([
-            # Add pipeline status refresh interval
-            dcc.Interval(
-                id="pipeline-check-interval",
-                interval=10000,  # check every 10 seconds
-                n_intervals=0
-            ),
             dbc.Container([
                 dbc.Row([
                     dbc.Col([
@@ -76,7 +77,9 @@ def create_layout(total_jobs: int) -> html.Div:
             # ── Stat Cards ──────────────────────────────────────
             dbc.Row([
                 dbc.Col(create_stat_card(
-                    "Total Jobs Analyzed", str(total_jobs), "📋", "#4361ee"), md=3),
+                    "Total Jobs Analyzed",
+                    str(total_jobs) if total_jobs > 0 else "Loading...",
+                    "📋", "#4361ee"), md=3),
                 dbc.Col(create_stat_card(
                     "Unique Skills Found", "505", "🔧", "#f72585"), md=3),
                 dbc.Col(create_stat_card(
@@ -88,22 +91,18 @@ def create_layout(total_jobs: int) -> html.Div:
             # ── Tabs ────────────────────────────────────────────
             dbc.Tabs([
 
-                # ── Tab 1: Skill Intelligence ────────────────────
+                # Tab 1: Skill Intelligence
                 dbc.Tab(label="🔥 Skill Intelligence", tab_style=TAB_STYLE, children=[
                     html.Br(),
                     dbc.Row([
                         dbc.Col([
                             dbc.Card([
-                                dbc.CardBody([
-                                    dcc.Graph(id="top-skills-bar")
-                                ])
+                                dbc.CardBody([dcc.Graph(id="top-skills-bar")])
                             ], style=CARD_STYLE)
                         ], md=7),
                         dbc.Col([
                             dbc.Card([
-                                dbc.CardBody([
-                                    dcc.Graph(id="skill-category-pie")
-                                ])
+                                dbc.CardBody([dcc.Graph(id="skill-category-pie")])
                             ], style=CARD_STYLE)
                         ], md=5),
                     ]),
@@ -127,15 +126,13 @@ def create_layout(total_jobs: int) -> html.Div:
                     ])
                 ]),
 
-                # ── Tab 2: Keyword Trends ────────────────────────
+                # Tab 2: Keyword Trends
                 dbc.Tab(label="📈 Keyword Trends", tab_style=TAB_STYLE, children=[
                     html.Br(),
                     dbc.Row([
                         dbc.Col([
                             dbc.Card([
-                                dbc.CardBody([
-                                    dcc.Graph(id="keyword-treemap")
-                                ])
+                                dbc.CardBody([dcc.Graph(id="keyword-treemap")])
                             ], style=CARD_STYLE)
                         ], md=12)
                     ]),
@@ -153,22 +150,20 @@ def create_layout(total_jobs: int) -> html.Div:
                     ])
                 ]),
 
-                # ── Tab 3: Topic Explorer ────────────────────────
+                # Tab 3: Topic Explorer
                 dbc.Tab(label="🧠 Topic Explorer", tab_style=TAB_STYLE, children=[
                     html.Br(),
                     dbc.Row([
                         dbc.Col([
                             dbc.Card([
-                                dbc.CardBody([
-                                    dcc.Graph(id="topic-distribution-bar")
-                                ])
+                                dbc.CardBody([dcc.Graph(id="topic-distribution-bar")])
                             ], style=CARD_STYLE)
                         ], md=12)
                     ])
                 ]),
 
-                # ── Tab 4: Resume Tab ────────────────────────
-                dbc.Tab(label="📄 Resume Insights", tab_style=TAB_STYLE, children=[
+                # Tab 4: Resume Scorer
+                dbc.Tab(label="🤖 Resume Scorer", tab_style=TAB_STYLE, children=[
                     html.Br(),
                     create_resume_tab_layout()
                 ]),
@@ -177,9 +172,10 @@ def create_layout(total_jobs: int) -> html.Div:
 
             html.Footer([
                 html.Hr(),
-                html.P("Job Market Intelligence Platform • Built with Plotly Dash + PostgreSQL + BERTopic",
-                       className="text-center text-muted",
-                       style={"fontSize": "12px"})
+                html.P(
+                    "Job Market Intelligence Platform • Built with Plotly Dash + PostgreSQL + BERTopic",
+                    className="text-center text-muted",
+                    style={"fontSize": "12px"})
             ])
 
         ], fluid=True)
