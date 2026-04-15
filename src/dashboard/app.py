@@ -37,20 +37,22 @@ def create_app() -> dash.Dash:
         suppress_callback_exceptions=True
     )
     total_jobs = get_total_jobs()
+    logger.info(f"Dashboard initializing with {total_jobs} jobs in DB")
     app.layout = create_layout(total_jobs)
     register_callbacks(app)
     register_resume_callbacks(app)
     return app
 
+
+# Module-level app and server for gunicorn
 app = create_app()
-server = app.server # Required for gunicorn
+server = app.server
+
 
 if __name__ == "__main__":
     logger.info("=" * 60)
     logger.info("STARTING DASHBOARD")
     logger.info("=" * 60)
-
-    app = create_app()
     app_env = os.getenv("APP_ENV", "development")
     debug_mode = app_env == "development"
     logger.info("Dashboard running at http://localhost:8050")

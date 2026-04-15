@@ -1,43 +1,46 @@
-# Dockerfile
-
 FROM python:3.11-slim
 
-# Set working directory
 WORKDIR /app
 
-# Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app
 
-# Install system dependencies
 RUN apt-get update && apt-get install -y \
-    gcc \
-    g++ \
-    libpq-dev \
-    curl \
+    gcc g++ libpq-dev curl \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy and install Python dependencies
 COPY requirements.txt .
 RUN pip install --upgrade pip && \
     pip install -r requirements.txt
 
-# Download spaCy model
 RUN pip install https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.7.1/en_core_web_sm-3.7.1-py3-none-any.whl
 
-# Copy project files
+# Copy full project
 COPY . .
 
-# Create necessary directories
+# Create directories
 RUN mkdir -p logs data/processed data/raw
 
-# Make entrypoint executable
+# ── PRE-PROCESS DATA AT BUILD TIME ──────────────────────────
+# This runs ingestion + NLP + NER during docker build
+# So processed CSVs are baked into the image
+# No timeout issues at deploy time
+RUN if [ -f "data/raw/jobs.csv" ]; then \
+    echo "Running ingestion pipeline..." && \
+    python -m src.ingestion.run_ingestion && \
+    echo "Running NLP pipeline..." && \
+    python -m src.nlp.run_nlp && \
+    echo "Running NER pipeline..." && \
+    python -m src.nlp.run_ner && \
+    echo "Data preprocessing complete ✅"; \
+    else \
+    echo "WARNING: data/raw/jobs.csv not found, skipping preprocessing"; \
+    fi
+
 RUN chmod +x scripts/entrypoint.sh
 
-# Expose dashboard port
 EXPOSE 8050
 
-# Run entrypoint
 ENTRYPOINT ["scripts/entrypoint.sh"]

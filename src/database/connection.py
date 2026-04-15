@@ -57,8 +57,8 @@ def get_engine():
         url,
         echo=False,
         pool_pre_ping=True,
-        pool_size=3,        # Max 3 persistent connections
-        max_overflow=2,     # Max 2 overflow = 5 total max
+        pool_size=3,
+        max_overflow=2,
         pool_timeout=30,
         pool_recycle=300,
         connect_args=connect_args

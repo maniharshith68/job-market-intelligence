@@ -4,8 +4,9 @@ import pandas as pd
 from dash import Input, Output
 import dash_bootstrap_components as dbc
 from dash import html
-import sys
+import plotly.graph_objects as go
 import os
+import sys
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
 from src.utils.logger import get_logger
@@ -28,10 +29,40 @@ from src.dashboard.charts import (
 
 logger = get_logger("dashboard.callbacks")
 
+LOADING_FIGURE = go.Figure()
+LOADING_FIGURE.update_layout(
+    title="⏳ Data loading, please wait...",
+    template="plotly_white",
+    height=450,
+    annotations=[{
+        "text": "Pipeline is running in background.<br>Charts will load automatically.",
+        "xref": "paper", "yref": "paper",
+        "x": 0.5, "y": 0.5,
+        "xanchor": "center", "yanchor": "middle",
+        "showarrow": False,
+        "font": {"size": 14, "color": "#636e72"}
+    }]
+)
+
+
+def safe_figure(build_fn, *args, fallback_title="⏳ Data loading..."):
+    """Safely call a chart builder, return loading figure on any error."""
+    try:
+        return build_fn(*args)
+    except Exception as e:
+        logger.warning(f"{fallback_title} error: {str(e)[:120]}")
+        fig = go.Figure()
+        fig.update_layout(
+            title=fallback_title,
+            template="plotly_white",
+            height=450
+        )
+        return fig
+
 
 def register_callbacks(app):
 
-    # ── Auto-refresh all charts every 30s until data loads ──────
+    # ── Auto-refresh status check ────────────────────────────────
     @app.callback(
         Output("stats-refresh-output", "children"),
         Input("stats-refresh-interval", "n_intervals")
@@ -39,12 +70,13 @@ def register_callbacks(app):
     def refresh_pipeline_status(n):
         try:
             count = get_total_job_count()
-            logger.info(f"Pipeline status check — jobs in DB: {count}")
+            if count and count > 0:
+                logger.info(f"DB status: {count} jobs available")
         except Exception as e:
-            logger.warning(f"Status check failed: {e}")
+            logger.warning(f"Status check failed: {str(e)[:80]}")
         return ""
 
-    # ── Populate job title dropdown ──────────────────────────────
+    # ── Job title dropdown ───────────────────────────────────────
     @app.callback(
         Output("job-title-dropdown", "options"),
         Input("stats-refresh-interval", "n_intervals")
@@ -56,45 +88,29 @@ def register_callbacks(app):
         except Exception:
             return []
 
-    # ── Tab 1: Top Skills Bar ────────────────────────────────────
+    # ── Top Skills Bar ───────────────────────────────────────────
     @app.callback(
         Output("top-skills-bar", "figure"),
         Input("stats-refresh-interval", "n_intervals")
     )
     def update_top_skills_bar(n):
-        try:
-            df = get_top_skills()
-            return build_top_skills_bar(df)
-        except Exception as e:
-            logger.warning(f"top-skills-bar error: {e}")
-            import plotly.graph_objects as go
-            fig = go.Figure()
-            fig.update_layout(
-                title="⏳ Pipeline running, data loading...",
-                template="plotly_white", height=450
-            )
-            return fig
+        return safe_figure(
+            lambda: build_top_skills_bar(get_top_skills()),
+            fallback_title="⏳ Skills loading..."
+        )
 
-    # ── Tab 1: Skill Category Pie ────────────────────────────────
+    # ── Skill Category Pie ───────────────────────────────────────
     @app.callback(
         Output("skill-category-pie", "figure"),
         Input("stats-refresh-interval", "n_intervals")
     )
     def update_skill_category_pie(n):
-        try:
-            df = get_skill_category_breakdown()
-            return build_skill_category_pie(df)
-        except Exception as e:
-            logger.warning(f"skill-category-pie error: {e}")
-            import plotly.graph_objects as go
-            fig = go.Figure()
-            fig.update_layout(
-                title="⏳ Pipeline running, data loading...",
-                template="plotly_white", height=450
-            )
-            return fig
+        return safe_figure(
+            lambda: build_skill_category_pie(get_skill_category_breakdown()),
+            fallback_title="⏳ Categories loading..."
+        )
 
-    # ── Tab 1: Job Title Keywords Bar ────────────────────────────
+    # ── Job Title Keywords Bar ───────────────────────────────────
     @app.callback(
         Output("job-title-keywords-bar", "figure"),
         Input("job-title-dropdown", "value")
@@ -103,34 +119,25 @@ def register_callbacks(app):
         if not selected_title:
             df = pd.DataFrame(columns=["keyword", "frequency"])
             return build_job_title_keywords_bar(df, "Select a job title above")
-        try:
-            df = get_top_keywords_by_title(selected_title)
-            return build_job_title_keywords_bar(df, selected_title)
-        except Exception as e:
-            logger.warning(f"job-title-keywords error: {e}")
-            import plotly.graph_objects as go
-            return go.Figure()
+        return safe_figure(
+            lambda: build_job_title_keywords_bar(
+                get_top_keywords_by_title(selected_title), selected_title
+            ),
+            fallback_title="⏳ Loading keywords..."
+        )
 
-    # ── Tab 2: Keyword Treemap ───────────────────────────────────
+    # ── Keyword Treemap ──────────────────────────────────────────
     @app.callback(
         Output("keyword-treemap", "figure"),
         Input("stats-refresh-interval", "n_intervals")
     )
     def update_keyword_treemap(n):
-        try:
-            df = get_keyword_trends(limit=50)
-            return build_keyword_treemap(df)
-        except Exception as e:
-            logger.warning(f"keyword-treemap error: {e}")
-            import plotly.graph_objects as go
-            fig = go.Figure()
-            fig.update_layout(
-                title="⏳ Pipeline running, data loading...",
-                template="plotly_white", height=500
-            )
-            return fig
+        return safe_figure(
+            lambda: build_keyword_treemap(get_keyword_trends(limit=50)),
+            fallback_title="⏳ Keywords loading..."
+        )
 
-    # ── Tab 2: Keyword Table ─────────────────────────────────────
+    # ── Keyword Table ────────────────────────────────────────────
     @app.callback(
         Output("keyword-table", "children"),
         Input("stats-refresh-interval", "n_intervals")
@@ -141,17 +148,20 @@ def register_callbacks(app):
             df.columns = ["Keyword", "Total Frequency"]
             df["Rank"] = range(1, len(df) + 1)
             df = df[["Rank", "Keyword", "Total Frequency"]]
-            rows = []
-            for _, row in df.iterrows():
-                rows.append(html.Tr([
+            rows = [
+                html.Tr([
                     html.Td(int(row["Rank"]),
                             style={"fontWeight": "600", "color": "#4361ee"}),
                     html.Td(row["Keyword"].title()),
                     html.Td(int(row["Total Frequency"]))
-                ]))
+                ])
+                for _, row in df.iterrows()
+            ]
             return dbc.Table(
                 [html.Thead(html.Tr([
-                    html.Th("Rank"), html.Th("Keyword"), html.Th("Total Frequency")
+                    html.Th("Rank"),
+                    html.Th("Keyword"),
+                    html.Th("Total Frequency")
                 ]))] + [html.Tbody(rows)],
                 striped=True, hover=True, responsive=True,
                 style={"fontSize": "14px"}
@@ -160,21 +170,13 @@ def register_callbacks(app):
             return html.P("⏳ Data loading, please wait...",
                           className="text-muted")
 
-    # ── Tab 3: Topic Distribution ────────────────────────────────
+    # ── Topic Distribution ───────────────────────────────────────
     @app.callback(
         Output("topic-distribution-bar", "figure"),
         Input("stats-refresh-interval", "n_intervals")
     )
     def update_topic_distribution(n):
-        try:
-            df = get_topic_distribution()
-            return build_topic_distribution_bar(df)
-        except Exception as e:
-            logger.warning(f"topic-distribution error: {e}")
-            import plotly.graph_objects as go
-            fig = go.Figure()
-            fig.update_layout(
-                title="⏳ Pipeline running, data loading...",
-                template="plotly_white", height=450
-            )
-            return fig
+        return safe_figure(
+            lambda: build_topic_distribution_bar(get_topic_distribution()),
+            fallback_title="⏳ Topics loading..."
+        )

@@ -5,7 +5,7 @@ echo "============================================================"
 echo "  JOB MARKET INTELLIGENCE PLATFORM — STARTING UP"
 echo "============================================================"
 
-echo "[1/2] Waiting for PostgreSQL..."
+echo "[1/3] Waiting for PostgreSQL..."
 python - <<EOF
 import time
 import psycopg2
@@ -25,10 +25,11 @@ extra = {"sslmode": "require"} if (
     "pooler" in host
 ) else {}
 
-orig_getaddrinfo = socket.getaddrinfo
-def getaddrinfo_ipv4(h, p, family=0, type=0, proto=0, flags=0):
-    return orig_getaddrinfo(h, p, socket.AF_INET, type, proto, flags)
-socket.getaddrinfo = getaddrinfo_ipv4
+# Force IPv4 — required for Render free tier
+orig = socket.getaddrinfo
+def ipv4(h, p, family=0, type=0, proto=0, flags=0):
+    return orig(h, p, socket.AF_INET, type, proto, flags)
+socket.getaddrinfo = ipv4
 
 for i in range(60):
     try:
@@ -49,12 +50,7 @@ else:
     exit(1)
 EOF
 
-if [ ! -f "data/raw/jobs.csv" ]; then
-    echo "ERROR: data/raw/jobs.csv not found!"
-    exit 1
-fi
-
-echo "[2/2] Checking if pipeline needs to run..."
+echo "[2/3] Loading data into database..."
 python - <<EOF
 import os
 import sys
@@ -70,46 +66,33 @@ sys.path.insert(0, '/app')
 os.environ.setdefault('APP_ENV', 'production')
 
 from src.database.connection import get_engine, test_connection
+from src.database.models import Base
 from sqlalchemy import text
 
 engine = get_engine()
-needs_pipeline = True
 
+# Always create tables first
+Base.metadata.create_all(engine)
+print("  Tables created/verified ✅")
+
+# Check if data already loaded
 try:
     with engine.connect() as conn:
         result = conn.execute(text("SELECT COUNT(*) FROM job_postings"))
         count = result.scalar()
         if count and count > 0:
-            print(f"  DB already has {count} jobs — skipping pipeline ✅")
-            needs_pipeline = False
-        else:
-            print("  DB is empty — pipeline needed")
+            print(f"  DB already has {count} jobs — skipping insert ✅")
+            exit(0)
 except Exception as e:
-    print(f"  DB check: {str(e)[:100]} — running pipeline")
+    print(f"  DB check error: {e}")
 
-if needs_pipeline:
-    print("[3/5] Running ingestion pipeline...")
-    from src.ingestion.run_ingestion import run as run_ingestion
-    run_ingestion()
-    print("  Ingestion complete ✅")
-
-    print("[4/5] Running NLP + NER pipelines...")
-    from src.nlp.run_nlp import run as run_nlp
-    run_nlp()
-    from src.nlp.run_ner import run as run_ner
-    run_ner()
-    print("  NLP + NER complete ✅")
-
-    print("[5/5] Loading data into database...")
-    from src.database.run_database import run as run_db
-    run_db()
-    print("  Database loaded ✅")
-
-print("Pipeline check complete — starting dashboard...")
+# Load data from pre-built CSVs
+print("  Inserting data from pre-built CSVs...")
+from src.database.run_database import run as run_db
+run_db()
+print("  Database loaded ✅")
 EOF
 
-# REPLACE the last line
+echo "[3/3] Starting dashboard..."
 echo "============================================================"
-echo "  Starting dashboard at http://0.0.0.0:8050"
-echo "============================================================"
-gunicorn --config gunicorn_config.py "src.dashboard.app:server"
+python -m src.dashboard.app
